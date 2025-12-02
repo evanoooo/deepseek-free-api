@@ -1,9 +1,8 @@
-# DeepSeek V3 Free 服务
+# DeepSeek AI Free 服务
 
 ## 项目说明
 
 <span>[ 中文 | <a href="README_EN.md">English</a> ]</span>
-
 
 支持高速流式输出、支持多轮对话、支持联网搜索、支持R1深度思考和静默深度思考，零配置部署，多路token支持。
 
@@ -46,11 +45,21 @@
 
 ## 效果示例
 
+### 服务默认首页
+
+服务启动后，默认首页添加了接入指南和接口说明，方便快速接入，不用来回切换找文档。
+
+![index.html](./doc/index.png)
+
 ### Gemini-cli接入
+
+版本添加了gemini-cli适配器，可以直接在gemini-cli中调用API。
 
 ![gemini-cli](./doc/gemini-cli.png)
 
 ### Claude-code接入
+
+版本添加了Claude-code适配器，可以直接在Claude-code中调用API。
 
 ![claude-code](./doc/claude-code.png)
 
@@ -84,16 +93,48 @@
 
 每次请求服务会从中挑选一个。
 
-### 环境变量（可选）
+## Docker部署
 
-| 环境变量 | 是否必填 | 说明                               |
-|------|------|----------------------------------|
-|  DEEP_SEEK_CHAT_AUTHORIZATION   | 否    | 当配置了token 则使用token，未配置则需要在请求头中传递Authorization |
+请准备一台具有公网IP的服务器并将8000端口开放。
 
-## Docker-compose运行
-clone 本仓库，运行下面的代码
+拉取镜像并启动服务
+
 ```shell
-docker compose up -d --build
+docker run -it -d --init --name glm-free-api -p 8000:8000 -e TZ=Asia/Shanghai akashrajpuroh1t/deepseek-free-api-fix
+```
+
+查看服务实时日志
+
+```shell
+docker logs -f deepseek-free-api
+```
+
+重启服务
+
+```shell
+docker restart deepseek-free-api
+```
+
+停止服务
+
+```shell
+docker stop deepseek-free-api
+```
+
+### Docker-compose部署
+
+```yaml
+version: '3'
+
+services:
+  deepseek-free-api:
+    container_name: deepseek-free-api
+    image: akashrajpuroh1t/deepseek-free-api-fix:latest
+    restart: always
+    ports:
+      - "8000:8000"
+    environment:
+      - TZ=Asia/Shanghai
 ```
 
 ## 接口列表
@@ -105,8 +146,6 @@ docker compose up -d --build
 3. 与Anthropic Claude兼容的 `/v1/messages` 接口
 
 可自行使用与openai、gemini-cli、claude-code或其他兼容的客户端接入接口，或者使用 [dify](https://dify.ai/) 等线上服务接入使用。
-
-
 
 ### 对话补全
 

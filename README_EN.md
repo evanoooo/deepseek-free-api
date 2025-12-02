@@ -1,4 +1,6 @@
-# DeepSeek-Free-API
+# DeepSeek AI Free Service
+
+## Project Description
 
 <span>[ 中文 | <a href="README_EN.md">English</a> ]</span>
 
@@ -43,11 +45,21 @@ Note: The current fork version has not found any malicious code, welcome to revi
 
 ## Usage Examples
 
+### Service Default Homepage
+
+After the service starts, the default homepage includes integration guides and interface descriptions for quick access, no need to switch back and forth to find documentation.
+
+![index.html](./doc/index.png)
+
 ### Gemini-cli Integration
+
+Version adds gemini-cli adapter, you can directly call the API in gemini-cli.
 
 ![gemini-cli](./doc/gemini-cli.png)
 
 ### Claude-code Integration
+
+Version adds claude-code adapter, you can directly call the API in claude-code.
 
 ![claude-code](./doc/claude-code.png)
 
@@ -80,6 +92,50 @@ Currently, the same account can only have *one* output at a time. You can provid
 `Authorization: Bearer TOKEN1,TOKEN2,TOKEN3`
 
 Each request will randomly select one from the tokens.
+
+## Docker Deployment
+
+Please prepare a server with a public IP address and open port 8000.
+
+Pull the image and start the service
+
+```shell
+docker run -it -d --init --name glm-free-api -p 8000:8000 -e TZ=Asia/Shanghai akashrajpuroh1t/deepseek-free-api-fix
+```
+
+View service real-time logs
+
+```shell
+docker logs -f deepseek-free-api
+```
+
+Restart service
+
+```shell
+docker restart deepseek-free-api
+```
+
+Stop service
+
+```shell
+docker stop deepseek-free-api
+```
+
+### Docker-compose Deployment
+
+```yaml
+version: '3'
+
+services:
+  deepseek-free-api:
+    container_name: deepseek-free-api
+    image: akashrajpuroh1t/deepseek-free-api-fix:latest
+    restart: always
+    ports:
+      - "8000:8000"
+    environment:
+      - TZ=Asia/Shanghai
+```
 
 ### Environment Variables (Optional)
 
