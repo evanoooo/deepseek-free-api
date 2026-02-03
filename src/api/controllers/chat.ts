@@ -569,10 +569,12 @@ async function receiveStream(model: string, stream: any, refConvId?: string): Pr
 
         // Append value to the correct accumulator based on current path
         if (typeof chunk.v === 'string') {
+          // 去除 FINISHED 标记
+          const cleanedValue = chunk.v.replace(/FINISHED/g, '');
           if (currentPath === 'thinking') {
-            accumulatedThinkingContent += chunk.v;
+            accumulatedThinkingContent += cleanedValue;
           } else if (currentPath === 'content') {
-            accumulatedContent += chunk.v;
+            accumulatedContent += cleanedValue;
           }
         }
       } catch (err) {
@@ -691,9 +693,12 @@ async function createTransStream(model: string, stream: any, refConvId: string, 
           isFirstChunk = false;
         }
 
+        // 去除 FINISHED 标记
+        const cleanedValue = chunk.v.replace(/FINISHED/g, '');
+
         const content = isSearchSilentModel
-          ? chunk.v.replace(/\[citation:(\d+)\]/g, '')
-          : chunk.v.replace(/\[citation:(\d+)\]/g, '[$1]');
+          ? cleanedValue.replace(/\[citation:(\d+)\]/g, '')
+          : cleanedValue.replace(/\[citation:(\d+)\]/g, '[$1]');
 
         if (currentPath === 'thinking') {
           if (isSilentModel) return;
