@@ -35,11 +35,11 @@ const FAKE_HEADERS = {
   "Sec-Fetch-Mode": "cors",
   "Sec-Fetch-Site": "same-origin",
   "User-Agent":
-    "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/134.0.0.0 Safari/537.36",
+    "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/145.0.0.0 Safari/537.36",
   "X-App-Version": "20241129.1",
   "X-Client-Locale": "zh-CN",
   "X-Client-Platform": "web",
-  "X-Client-Version": "1.0.0-always",
+  "X-Client-Version": "1.6.1",
 };
 const EVENT_COMMIT_ID = '41e9c7b1';
 // 当前IP地址
@@ -81,6 +81,7 @@ async function requestToken(refreshToken: string) {
   accessTokenRequestQueueMap[refreshToken] = [];
   logger.info(`Refresh token: ${refreshToken}`);
   const result = await (async () => {
+    logger.info(`FAKE_HEADERS: ${JSON.stringify(FAKE_HEADERS)}`);
     const result = await axios.get(
       "https://chat.deepseek.com/api/v0/users/current",
       {
@@ -545,6 +546,7 @@ async function receiveStream(model: string, stream: any, refConvId?: string): Pr
   let accumulatedContent = "";
   let accumulatedThinkingContent = "";
   let messageId = '';
+  let accumulatedTokenUsage = 2;
   const created = util.unixTimestamp();
   let currentPath = ''; // State to track the current content type
 
@@ -560,14 +562,50 @@ async function receiveStream(model: string, stream: any, refConvId?: string): Pr
           messageId = chunk.response_message_id;
         }
 
-        // Update current path if specified
-        if (chunk.p === 'response/thinking_content') {
-          currentPath = 'thinking';
-        } else if (chunk.p === 'response/content') {
+        if (chunk.v && chunk.v.response) {
+          if (chunk.v.response.thinking_enabled) {
+            currentPath = 'thinking';
+          } else {
+            currentPath = 'content';
+          }
+        } else if (chunk.p === 'response/fragments') {
           currentPath = 'content';
         }
 
+        // Update current path if specified
+        // if (chunk.p === 'response/thinking_content') {
+        //
+        // } else if (chunk.p === 'response/content') {
+        //   currentPath = 'content';
+        // }
+
         // Append value to the correct accumulator based on current path
+        if (typeof chunk.v === 'object' && Array.isArray(chunk.v)) {
+          chunk.v.map(e => {
+            if (e.accumulated_token_usage && typeof e.v === 'number') {
+              accumulatedTokenUsage = e.v;
+            }
+            if (Array.isArray(e.v)) {
+              const cleanedValue = e.v.map(v => {
+                return v.content
+              }).join().replace(/FINISHED/g, '');
+              if (currentPath === 'thinking') {
+                accumulatedThinkingContent += cleanedValue;
+              } else if (currentPath === 'content') {
+                accumulatedContent += cleanedValue;
+              }
+            }
+          })
+
+          // // 去除 FINISHED 标记
+          // const cleanedValue = chunk.v.replace(/FINISHED/g, '');
+          // if (currentPath === 'thinking') {
+          //   accumulatedThinkingContent += cleanedValue;
+          // } else if (currentPath === 'content') {
+          //   accumulatedContent += cleanedValue;
+          // }
+        }
+
         if (typeof chunk.v === 'string') {
           // 去除 FINISHED 标记
           const cleanedValue = chunk.v.replace(/FINISHED/g, '');
@@ -599,7 +637,7 @@ async function receiveStream(model: string, stream: any, refConvId?: string): Pr
           },
           finish_reason: "stop",
         }],
-        usage: { prompt_tokens: 1, completion_tokens: 1, total_tokens: 2 }, // Mocked
+        usage: { prompt_tokens: 1, completion_tokens: 1, total_tokens: accumulatedTokenUsage }, // Mocked
         created,
       };
       logger.success(`[NON-STREAM] Resolving with final response: ${JSON.stringify(finalResponse, null, 2)}`);
@@ -632,6 +670,7 @@ async function createTransStream(model: string, stream: any, refConvId: string, 
   let currentPath = '';
   let searchResults: any[] = [];
   let thinkingStarted = false;
+  let accumulatedTokenUsage = 2;
 
   const parser = createParser((event) => {
     try {
@@ -652,7 +691,7 @@ async function createTransStream(model: string, stream: any, refConvId: string, 
             transStream.write(`data: ${JSON.stringify({ id: `${refConvId}@${messageId}`, model, object: "chat.completion.chunk", choices: [{ index: 0, delta: { content: citationContent }, finish_reason: null }], created })}\n\n`);
           }
         }
-        transStream.write(`data: ${JSON.stringify({ id: `${refConvId}@${messageId}`, model, object: "chat.completion.chunk", choices: [{ index: 0, delta: {}, finish_reason: "stop" }], created })}\n\n`);
+        transStream.write(`data: ${JSON.stringify({ id: `${refConvId}@${messageId}`, model, object: "chat.completion.chunk", choices: [{ index: 0, delta: {}, finish_reason: "stop" }], usage: { prompt_tokens: 1, completion_tokens: accumulatedTokenUsage, total_tokens: accumulatedTokenUsage + 1 }, created })}\n\n`);
         !transStream.closed && transStream.end("data: [DONE]\n\n");
         endCallback && endCallback();
         return;
@@ -665,10 +704,26 @@ async function createTransStream(model: string, stream: any, refConvId: string, 
 
       if (chunk.response_message_id && !messageId) messageId = chunk.response_message_id;
 
-      if (chunk.p === 'response/thinking_content') currentPath = 'thinking';
-      else if (chunk.p === 'response/content') currentPath = 'content';
+
+      if (chunk.v && chunk.v.response) {
+        if (chunk.v.response.thinking_enabled) {
+          currentPath = 'thinking';
+        } else {
+          currentPath = 'content';
+        }
+      } else if (chunk.p === 'response/fragments') {
+        currentPath = 'content';
+      }
+
       else if (chunk.p === 'response/search_status') return;
 
+      if (chunk.p === 'response' && Array.isArray(chunk.v)) {
+        chunk.v.map(e => {
+          if (e.p === 'accumulated_token_usage' && typeof e.v === 'number') {
+            accumulatedTokenUsage = e.v;
+          }
+        })
+      }
       if (chunk.p === 'response/search_results' && Array.isArray(chunk.v)) {
         if (chunk.o !== 'BATCH') { // Initial search results
           searchResults = chunk.v;
@@ -686,7 +741,23 @@ async function createTransStream(model: string, stream: any, refConvId: string, 
         return; // We've handled this event.
       }
 
-      if (typeof chunk.v === 'string') {
+      if (typeof chunk.v === 'object' && Array.isArray(chunk.v)) {
+
+      }
+
+      if (typeof chunk.v === 'string' || Array.isArray(chunk.v)) {
+        let c = "";
+        if (Array.isArray(chunk.v)) {
+          chunk.v.map(e => {
+            if (Array.isArray(e.v)) {
+              c = e.v.map(v => {
+                return v.content
+              }).join();
+            }
+          })
+        } else {
+          c = chunk.v;
+        }
         const delta: { role?: string, content?: string, reasoning_content?: string } = {};
         if (isFirstChunk) {
           delta.role = "assistant";
@@ -694,7 +765,7 @@ async function createTransStream(model: string, stream: any, refConvId: string, 
         }
 
         // 去除 FINISHED 标记
-        const cleanedValue = chunk.v.replace(/FINISHED/g, '');
+        const cleanedValue = c.replace(/FINISHED/g, '');
 
         const content = isSearchSilentModel
           ? cleanedValue.replace(/\[citation:(\d+)\]/g, '')
@@ -1189,7 +1260,7 @@ async function getThinkingQuota(refreshToken: string) {
 async function fetchAppVersion(): Promise<string> {
   try {
     logger.info('自动获取版本号');
-    const response = await axios.get('https://chat.deepseek.com/version.txt', {
+    const response = await axios.get('https://raw.githubusercontent.com/xiaoY233/DeepSeek-Free-API/master/version.txt', {
       timeout: 5000,
       validateStatus: () => true,
       headers: {
@@ -1199,13 +1270,17 @@ async function fetchAppVersion(): Promise<string> {
     });
     if (response.status === 200 && response.data) {
       const version = response.data.toString().trim();
+      if(version.length > 20) {
+        logger.info(`获取版本号: 20241129.1`);
+        return "20241129.1";
+      }
       logger.info(`获取版本号: ${version}`);
       return version;
     }
   } catch (err) {
     logger.error('获取版本号失败:', err);
   }
-  return "20241018.0";
+  return "20241129.1";
 }
 
 function autoUpdateAppVersion() {

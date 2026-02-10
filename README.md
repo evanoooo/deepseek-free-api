@@ -28,6 +28,13 @@
 
 ### 版本说明
 
+- v1.0.2-fix (2026-02-10)
+    - 感谢 [@evanoooo](https://github.com/evanoooo/DeepSeek-Free-API) 提供的修复更新
+    - 更新User-Agent和版本号，适配DeepSeek最新接口变更
+    - 优化流式响应处理逻辑，改进思考内容/普通内容的判断
+    - 添加token使用量统计功能
+    - 优化版本号自动获取机制
+
 - v1.0.1-fix (2026-02-03)
     - 修复会话完成后，可能会返回FINISHED标记的问题，影响内容输出（PS：过滤掉）
 

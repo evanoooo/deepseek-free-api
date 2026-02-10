@@ -28,6 +28,13 @@ Note: The current fork version has not found any malicious code, welcome to revi
 
 ### Version Information
 
+- v1.0.2-fix (2026-02-10)
+    - Thanks to [@evanoooo](https://github.com/evanoooo/DeepSeek-Free-API) for providing the fix updates
+    - Updated User-Agent and version number to adapt to DeepSeek's latest API changes
+    - Optimized streaming response processing logic, improved thinking content/normal content judgment
+    - Added token usage statistics feature
+    - Optimized automatic version number retrieval mechanism
+
 - v1.0.1-fix (2026-02-03)
     - After the session is repaired, there may be an issue where the FINISHED mark is returned, affecting content output (PS: Filtered out).
 
